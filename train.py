@@ -23,7 +23,6 @@ with open('input.txt', 'r', encoding="utf-8") as file:
 
 chars = sorted(list(set(text))) # All unique chars in the text
 vocab_size = len(chars)
-
 # Mapping the chars to integers
 stoi = { ch:i for i, ch in enumerate(chars) }
 itos = { i:ch for i, ch in enumerate(chars) }
@@ -32,14 +31,10 @@ decode = lambda l: ''.join([itos[i] for i in l])
 
 # Enconding the entire dataset and storing it into a torch.tensor 
 data = torch.tensor(encode(text), dtype=torch.long)
-
 # Split up the data into train and validation sets
 n = int(0.9*len(data))
 train_data = data[:n]
 val_data = data[n:]
-
-batch_size = 4
-block_size = 8
 
 def get_batch(split):
     data = train_data if split == 'train' else val_data
@@ -49,7 +44,19 @@ def get_batch(split):
     x, y = x.to(device), y.to(device)
     return x, y
 
-xb, yb = get_batch('train')
+@torch.no_grad()
+def estimate_loss():
+    out = {}
+    model.eval()
+    for split in {'train', 'val'}:
+        losses = torch.zeros(eval_iters)
+        for k in range(eval_iters):
+            X, Y = get_batch(split)
+            logits, loss = model(X, Y)
+            losses[k] = loss.item()
+        out[split] = losses.mean()
+    model.train()
+    return out
 
 class BigramLanguageModel(nn.Module):
 
@@ -84,13 +91,15 @@ class BigramLanguageModel(nn.Module):
 
 model = BigramLanguageModel(vocab_size)
 m = model.to(device)
-logits, loss = m(xb, yb)
 
 # PyTorch optimizer
 optimizer = torch.optim.AdamW(m.parameters(), lr=1e-3)
 
-batch_size = 32
-for steps in range(1000):
+for iter in range(max_iters):
+    if iter % eval_interval == 0:
+        losses = estimate_loss()
+        print(f"step {iter}: train loss {losses['train']:.4f}, val loss {losses['val']:.4f}")
+
     # sample a batch of data
     xb, yb = get_batch('train')
 
@@ -100,5 +109,5 @@ for steps in range(1000):
     loss.backward()
     optimizer.step()
 
-print(loss.item())
-print(decode(m.generate(idx = torch.zeros((1, 1), dtype=torch.long), max_new_tokens=100)[0].tolist()))
+context = torch.zeros((1, 1), dtype=torch.long, device=device)
+print(decode(m.generate(context, max_new_tokens=500)[0].tolist()))
