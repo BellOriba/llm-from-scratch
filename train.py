@@ -67,6 +67,7 @@ class BigramLanguageModel(nn.Module):
     def forward(self, idx, targets=None):
         # idx and targets are both (B, T) tensor of integers
         logits = self.token_embedding_table(idx) # (B, T, C) where C are the channels (vocab_size)
+        # (B, T, C) = Batch, Time, Channels
 
         if targets is None:
             loss = None
