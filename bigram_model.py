@@ -110,5 +110,7 @@ for iter in range(max_iters):
     loss.backward()
     optimizer.step()
 
-context = torch.zeros((1, 1), dtype=torch.long, device=device)
-print(decode(m.generate(context, max_new_tokens=500)[0].tolist()))
+if __name__ == '__main__':
+    print("Running 'bigram_model.py'")
+    context = torch.zeros((1, 1), dtype=torch.long, device=device)
+    print(decode(m.generate(context, max_new_tokens=500)[0].tolist()))
