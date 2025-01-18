@@ -45,7 +45,7 @@ def get_batch(split):
     return x, y
 
 @torch.no_grad()
-def estimate_loss():
+def estimate_loss(model):
     out = {}
     model.eval()
     for split in {'train', 'val'}:
@@ -90,27 +90,34 @@ class BigramLanguageModel(nn.Module):
             idx = torch.cat((idx, idx_next), dim=1) # (B, T+1)
         return idx
 
-model = BigramLanguageModel(vocab_size)
-m = model.to(device)
+def train_model(model, m):
+    # PyTorch optimizer
+    optimizer = torch.optim.AdamW(m.parameters(), lr=1e-3)
 
-# PyTorch optimizer
-optimizer = torch.optim.AdamW(m.parameters(), lr=1e-3)
+    for iter in range(max_iters):
+        if iter % eval_interval == 0:
+            losses = estimate_loss(model)
+            print(f"step {iter}: train loss {losses['train']:.4f}, val loss {losses['val']:.4f}")
 
-for iter in range(max_iters):
-    if iter % eval_interval == 0:
-        losses = estimate_loss()
-        print(f"step {iter}: train loss {losses['train']:.4f}, val loss {losses['val']:.4f}")
+        # sample a batch of data
+        xb, yb = get_batch('train')
 
-    # sample a batch of data
-    xb, yb = get_batch('train')
+        # evaluate the loss
+        logits, loss = m(xb, yb)
+        optimizer.zero_grad(set_to_none=True)
+        loss.backward()
+        optimizer.step()
 
-    # evaluate the loss
-    logits, loss = m(xb, yb)
-    optimizer.zero_grad(set_to_none=True)
-    loss.backward()
-    optimizer.step()
-
-if __name__ == '__main__':
+def main():
     print("Running 'bigram_model.py'")
+    
+    model = BigramLanguageModel(vocab_size)
+    m = model.to(device)
+
+    train_model(model, m)
+
     context = torch.zeros((1, 1), dtype=torch.long, device=device)
     print(decode(m.generate(context, max_new_tokens=500)[0].tolist()))
+
+if __name__ == '__main__':
+    main()
